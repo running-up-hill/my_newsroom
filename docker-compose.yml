@@ -1,0 +1,39 @@
+services:
+  collector:
+    build:
+      context: .                        # project root, so the Dockerfile can see schema.sql and config/
+      dockerfile: collector/Dockerfile
+    environment:
+      INTERVAL_SECONDS: "14400"         # 4 hours between runs
+    volumes:
+      - news-data:/data                 # named volume holds news.db (avoids WAL problems on Windows folders)
+    restart: unless-stopped
+
+  mcp_server:
+    image: newsroom-mcp                 # fixed name so Claude can `docker run newsroom-mcp`
+    build:
+      context: .
+      dockerfile: mcp_server/Dockerfile
+    volumes:
+      - news-data:/data
+    profiles: ["tools"]                 # `docker compose up` skips it; Claude starts it on demand
+
+  site_builder:
+    build:
+      context: .
+      dockerfile: site/Dockerfile
+    volumes:
+      - news-data:/data                 # reads digests from the database
+      - ./docs:/out                     # writes the page into your project folder
+    restart: unless-stopped
+
+  web:
+    image: nginx:alpine                 # serves ./docs at http://localhost:8080
+    ports:
+      - "8080:80"
+    volumes:
+      - ./docs:/usr/share/nginx/html:ro
+    restart: unless-stopped
+
+volumes:
+  news-data:
