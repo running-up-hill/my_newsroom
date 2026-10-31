@@ -1,12 +1,20 @@
+# One codebase, any number of newsrooms.
+#   Your own newsroom (unchanged):   docker compose up -d --build
+#   Another instance:                .\nr.ps1 <name> up -d --build     (see nr.ps1)
+# Everything below that varies per instance has a default matching your current setup, and is
+# overridden by instances/<name>/.env.
+
 services:
   collector:
+    image: newsroom-collector           # shared by every instance, so the code is built once
     build:
       context: .                        # project root, so the Dockerfile can see schema.sql and config/
       dockerfile: collector/Dockerfile
     environment:
       INTERVAL_SECONDS: "14400"         # 4 hours between runs
     volumes:
-      - news-data:/data                 # named volume holds news.db (avoids WAL problems on Windows folders)
+      - news-data:/data                 # named volume holds news.db; each instance gets its own copy
+      - ${SEED_FILE:-./config/seed.sql}:/app/config/seed.sql:ro   # starter feeds and topics; the file must exist
     restart: unless-stopped
 
   mcp_server:
@@ -19,20 +27,23 @@ services:
     profiles: ["tools"]                 # `docker compose up` skips it; Claude starts it on demand
 
   site_builder:
+    image: newsroom-site
     build:
       context: .
       dockerfile: site/Dockerfile
+    environment:
+      SITE_TITLE: "${SITE_TITLE:-My Newsroom}"
     volumes:
       - news-data:/data                 # reads digests from the database
-      - ./docs:/out                     # writes the page into your project folder
+      - ${SITE_DIR:-./docs}:/out        # writes the page into this folder
     restart: unless-stopped
 
   web:
-    image: nginx:alpine                 # serves ./docs at http://localhost:8080
+    image: nginx:alpine                 # serves the page locally
     ports:
-      - "8080:80"
+      - "${WEB_PORT:-8080}:80"
     volumes:
-      - ./docs:/usr/share/nginx/html:ro
+      - ${SITE_DIR:-./docs}:/usr/share/nginx/html:ro
     restart: unless-stopped
 
 volumes:

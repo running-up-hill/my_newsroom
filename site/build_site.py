@@ -38,8 +38,16 @@ def nice_date(iso: str) -> str:
     return f"{d.strftime('%A')} {d.day} {d.strftime('%B %Y')}"
 
 
+# Badge colours as HSL hues (0 = red, 140 = green, 215 = blue). New topics get a stable colour
+# from the palette below, chosen to stay clear of red, green and blue.
+TOPIC_HUES = {"war": 0, "sustainability": 140, "energy": 215}
+FALLBACK_HUES = [30, 280, 175, 320, 50, 245]            # orange, purple, teal, pink, yellow, indigo
+
+
 def hue(slug: str) -> int:
-    return zlib.crc32(slug.encode("utf-8")) % 360       # stable colour per topic
+    if slug in TOPIC_HUES:
+        return TOPIC_HUES[slug]
+    return FALLBACK_HUES[zlib.crc32(slug.encode("utf-8")) % len(FALLBACK_HUES)]
 
 
 # ---------- data ----------
